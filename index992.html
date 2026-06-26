@@ -1,0 +1,1179 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>📻 Radio Canarias - 65 Emisoras</title>
+    
+    <!-- HLS.js para soporte de streams HLS -->
+    <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+    
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            background: #0a0f1a;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            padding: 20px;
+            overflow-y: auto;
+        }
+        .radio-container {
+            max-width: 950px;
+            width: 100%;
+            background: linear-gradient(145deg, #1a2634, #0d1420);
+            border-radius: 50px;
+            padding: 30px;
+            box-shadow: 0 40px 80px rgba(0,0,0,0.8);
+            border: 1px solid rgba(255,255,255,0.03);
+            margin-top: 10px;
+        }
+        .volume-indicator {
+            position: fixed;
+            left: 50%;
+            top: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0,0,0,0.92);
+            padding: 25px 35px;
+            border-radius: 24px;
+            color: #f1f5f9;
+            font-size: 1.4rem;
+            font-weight: 600;
+            z-index: 200;
+            opacity: 0;
+            transition: opacity 0.15s ease;
+            pointer-events: none;
+            border: 1px solid rgba(251, 191, 36, 0.2);
+            text-align: center;
+            min-width: 160px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.9);
+        }
+        .volume-indicator.show { opacity: 1; }
+        .volume-indicator .vol-icon { font-size: 2.5rem; display: block; margin-bottom: 5px; }
+        .volume-indicator .vol-text { font-size: 1.2rem; letter-spacing: 1px; }
+        .volume-indicator .vol-bar {
+            width: 120px;
+            height: 6px;
+            background: #1e2a3a;
+            border-radius: 6px;
+            margin: 10px auto 0;
+            overflow: hidden;
+        }
+        .volume-indicator .vol-bar-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #fbbf24, #f59e0b);
+            border-radius: 6px;
+            transition: width 0.05s linear;
+        }
+        .radio-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+        .radio-header .brand {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .radio-header .brand h1 {
+            color: #f1f5f9;
+            font-size: 1.6rem;
+            font-weight: 700;
+        }
+        .radio-header .brand h1 span {
+            background: linear-gradient(135deg, #fbbf24, #f59e0b);
+            background-clip: text;
+            -webkit-background-clip: text;
+            color: transparent;
+        }
+        .radio-header .brand .icon { font-size: 2rem; }
+        .badge-internet {
+            background: rgba(74, 222, 128, 0.15);
+            color: #4ade80;
+            padding: 6px 14px;
+            border-radius: 60px;
+            font-size: 0.65rem;
+            font-weight: 600;
+            border: 1px solid rgba(74, 222, 128, 0.2);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .badge-internet .dot {
+            width: 6px;
+            height: 6px;
+            background: #4ade80;
+            border-radius: 50%;
+            display: inline-block;
+            animation: pulse 1.5s infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.3; transform: scale(0.7); }
+        }
+        .radio-display {
+            background: #0d1420;
+            border-radius: 24px;
+            padding: 20px;
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            margin-bottom: 15px;
+            border: 1px solid rgba(255,255,255,0.04);
+            flex-wrap: wrap;
+        }
+        .radio-display .logo {
+            width: 90px;
+            height: 90px;
+            border-radius: 20px;
+            background: #1a2634;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            font-size: 3.2rem;
+            border: 2px solid rgba(251, 191, 36, 0.15);
+        }
+        .radio-display .info { flex: 1; min-width: 120px; }
+        .radio-display .info .name {
+            color: #f1f5f9;
+            font-size: 1.2rem;
+            font-weight: 700;
+            margin-bottom: 2px;
+        }
+        .radio-display .info .freq { color: #94a3b8; font-size: 0.8rem; }
+        .radio-display .info .status {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-top: 6px;
+            font-size: 0.8rem;
+            flex-wrap: wrap;
+        }
+        .radio-display .info .status .playing { color: #4ade80; }
+        .radio-display .info .status .stopped { color: #94a3b8; }
+        .radio-display .info .status .error { color: #ef4444; }
+        .format-badge {
+            display: inline-block;
+            background: rgba(251, 191, 36, 0.15);
+            color: #fbbf24;
+            padding: 2px 10px;
+            border-radius: 40px;
+            font-size: 0.6rem;
+            font-weight: 600;
+            border: 1px solid rgba(251, 191, 36, 0.1);
+        }
+        .channel-indicator {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            margin-bottom: 10px;
+            background: #0d1420;
+            padding: 6px 14px;
+            border-radius: 40px;
+            border: 1px solid rgba(255,255,255,0.04);
+        }
+        .channel-indicator .nav-btn {
+            background: rgba(251, 191, 36, 0.1);
+            color: #fbbf24;
+            border: 1px solid rgba(251, 191, 36, 0.15);
+            padding: 6px 14px;
+            border-radius: 30px;
+            font-size: 0.8rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            min-width: 60px;
+            font-weight: 600;
+        }
+        .channel-indicator .nav-btn:hover {
+            background: rgba(251, 191, 36, 0.2);
+            transform: scale(1.02);
+        }
+        .channel-indicator .nav-btn:active { transform: scale(0.95); }
+        .channel-indicator .counter {
+            color: #94a3b8;
+            font-size: 0.8rem;
+            font-weight: 500;
+            min-width: 50px;
+            text-align: center;
+        }
+        .channel-indicator .counter span { color: #f1f5f9; font-weight: 700; }
+        .selector-section { margin-bottom: 12px; }
+        .selector-section select {
+            width: 100%;
+            padding: 12px 16px;
+            background: #0d1420;
+            color: #f1f5f9;
+            border: 1px solid #1e2a3a;
+            border-radius: 16px;
+            font-size: 0.9rem;
+            font-weight: 500;
+            cursor: pointer;
+            outline: none;
+            transition: all 0.3s;
+            appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='8' viewBox='0 0 14 8'%3E%3Cpath d='M1 1l6 6 6-6' stroke='%2394a3b8' stroke-width='2' fill='none'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 16px center;
+        }
+        .selector-section select:focus {
+            border-color: #fbbf24;
+            box-shadow: 0 0 0 3px rgba(251, 191, 36, 0.08);
+        }
+        .selector-section select option {
+            background: #1a2634;
+            color: #f1f5f9;
+            padding: 10px;
+        }
+        .audio-controls {
+            background: #0d1420;
+            border-radius: 60px;
+            padding: 8px 14px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            border: 1px solid rgba(255,255,255,0.04);
+            flex-wrap: wrap;
+        }
+        .audio-controls audio {
+            flex: 1;
+            height: 44px;
+            border-radius: 40px;
+            min-width: 120px;
+        }
+        .audio-controls audio::-webkit-media-controls-panel { background: #0d1420; }
+        .audio-controls .btn-play {
+            background: linear-gradient(135deg, #fbbf24, #f59e0b);
+            color: #0a0f1a;
+            border: none;
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            font-size: 1.2rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            font-weight: 700;
+        }
+        .audio-controls .btn-play:hover {
+            transform: scale(1.05);
+            box-shadow: 0 8px 30px rgba(251, 191, 36, 0.3);
+        }
+        .audio-controls .btn-play:active { transform: scale(0.92); }
+        .radio-footer {
+            margin-top: 15px;
+            padding-top: 14px;
+            border-top: 1px solid rgba(255,255,255,0.05);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+        .radio-footer .info-text { color: #475569; font-size: 0.7rem; }
+        .radio-footer .info-text strong { color: #94a3b8; }
+        .radio-footer .url-box {
+            background: #0d1420;
+            padding: 4px 12px;
+            border-radius: 40px;
+            font-family: monospace;
+            font-size: 0.55rem;
+            color: #475569;
+            border: 1px solid #1a2634;
+            max-width: 100%;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .radio-footer .count {
+            color: #64748b;
+            font-size: 0.65rem;
+            background: #0d1420;
+            padding: 4px 12px;
+            border-radius: 40px;
+            border: 1px solid #1a2634;
+            font-weight: 600;
+        }
+        .warning-msg {
+            background: rgba(251, 191, 36, 0.06);
+            border: 1px solid rgba(251, 191, 36, 0.1);
+            color: #fbbf24;
+            padding: 8px 14px;
+            border-radius: 14px;
+            font-size: 0.7rem;
+            margin-top: 10px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .touch-hint {
+            color: #475569;
+            font-size: 0.55rem;
+            text-align: center;
+            margin-top: 8px;
+            border-top: 1px solid rgba(255,255,255,0.03);
+            padding-top: 8px;
+            display: flex;
+            justify-content: center;
+            flex-wrap: wrap;
+            gap: 6px 12px;
+        }
+        .touch-hint span {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+        }
+        .touch-hint .key {
+            background: rgba(255,255,255,0.05);
+            padding: 1px 6px;
+            border-radius: 4px;
+            font-size: 0.5rem;
+            color: #94a3b8;
+        }
+        
+        @media (max-width: 650px) {
+            .radio-container { padding: 20px; border-radius: 30px; }
+            .radio-display { flex-direction: column; align-items: center; text-align: center; padding: 16px; }
+            .radio-display .logo { width: 70px; height: 70px; font-size: 2.5rem; }
+            .radio-display .info .name { font-size: 1rem; }
+            .audio-controls { flex-direction: column; align-items: stretch; border-radius: 30px; padding: 12px; }
+            .audio-controls .btn-play { align-self: center; width: 44px; height: 44px; font-size: 1rem; }
+            .radio-footer { flex-direction: column; align-items: stretch; }
+            .radio-footer .url-box { white-space: normal; word-break: break-all; }
+            .radio-header .brand h1 { font-size: 1.2rem; }
+            .badge-internet { font-size: 0.55rem; padding: 4px 10px; }
+            .touch-hint { font-size: 0.45rem; }
+            .touch-hint span { margin: 0 2px; }
+            .volume-indicator { padding: 14px 20px; font-size: 1rem; min-width: 120px; }
+            .volume-indicator .vol-bar { width: 90px; }
+        }
+        @media (max-width: 400px) {
+            .radio-container { padding: 12px; border-radius: 24px; }
+            .radio-display .logo { width: 60px; height: 60px; font-size: 2rem; }
+            .radio-display .info .name { font-size: 0.9rem; }
+            .volume-indicator { padding: 12px 16px; font-size: 0.9rem; min-width: 100px; }
+            .volume-indicator .vol-bar { width: 70px; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="radio-container">
+    <!-- ===== VOLUMEN INDICATOR ===== -->
+    <div class="volume-indicator" id="volumeIndicator">
+        <span class="vol-icon" id="volIcon">🔊</span>
+        <span class="vol-text" id="volText">50%</span>
+        <div class="vol-bar">
+            <div class="vol-bar-fill" id="volBarFill" style="width:50%"></div>
+        </div>
+    </div>
+
+    <!-- ===== HEADER ===== -->
+    <div class="radio-header">
+        <div class="brand">
+            <span class="icon">📻</span>
+            <h1><span>Radio</span> Canarias</h1>
+        </div>
+        <div class="badge-internet">
+            <span class="dot"></span> 65 EMISORAS
+        </div>
+    </div>
+
+    <!-- ===== DISPLAY ===== -->
+    <div class="radio-display" id="radioDisplay">
+        <div class="logo" id="logoContainer">📡</div>
+        <div class="info">
+            <div class="name" id="radioName">Selecciona una emisora</div>
+            <div class="freq" id="radioFreq">🌍 Disponible en todo el mundo</div>
+            <div class="status">
+                <span id="statusText" class="stopped">⏸️ En espera</span>
+                <span id="formatBadge" class="format-badge">MP3</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===== CHANNEL INDICATOR ===== -->
+    <div class="channel-indicator">
+        <button class="nav-btn" id="prevBtn">◀</button>
+        <span class="counter" id="channelCounter">1 / <span id="totalChannels">65</span></span>
+        <button class="nav-btn" id="nextBtn">▶</button>
+    </div>
+
+    <!-- ===== SELECTOR ===== -->
+    <div class="selector-section">
+        <select id="radioSelector">
+            <option value="" disabled selected>── Elige una emisora ──</option>
+            
+            <!-- ============================================ -->
+            <!-- EMISORAS CANARIAS (32)                       -->
+            <!-- ============================================ -->
+            
+            <option value="https://uk1.streamingpulse.com/ssl/inolvidablefm" 
+                    data-icon="🎵" 
+                    data-freq="95.8 FM · Gran Canaria">
+                🎵 Inolvidable FM
+            </option>
+            
+            <option value="https://stream.classichitsradio.net:8000/tenerife" 
+                    data-icon="🌊" 
+                    data-freq="102.5 FM · Tenerife">
+                🌊 Coast FM (Tenerife)
+            </option>
+            
+            <option value="https://stream.zeno.fm/da3ysra1zehvv" 
+                    data-icon="📡" 
+                    data-freq="Stream · Canarias">
+                📡 Vigilante Radio
+            </option>
+            
+            <option value="https://laspalmas-copesedes-rrcast.flumotion.com/copesedes/laspalmas-low.mp3" 
+                    data-icon="📢" 
+                    data-freq="99.1 FM · Gran Canaria">
+                📢 Cadena Cope (Gran Canaria)
+            </option>
+            
+            <option value="https://panel5.soydigital.fm/8030/stream" 
+                    data-icon="🔊" 
+                    data-freq="95.2 FM · Tenerife">
+                🔊 La Diez (Tenerife)
+            </option>
+            
+            <option value="https://f111.rndfnk.com/star/crtve/rne5/main/mp3/128/stream.mp3?aggregator=tunein&cid=01GEP4MW5CAHPYP1EXHVKWFJ8W&sid=2IWwik0pjflt7nAGvQgtygm0AAM&token=1knEpvqSpAKuPzAyUxWBrQjLujroiydtm-t0wrYvC08&tvf=IzQvaHI2LhdmMTExLnJuZGZuay5jb20" 
+                    data-icon="📻" 
+                    data-freq="90.3 FM · Madrid">
+                📻 RNE Radio 5 (Madrid)
+            </option>
+            
+            <option value="https://playerservices.streamtheworld.com/api/livestream-redirect/LOS40_SC" 
+                    data-icon="🎶" 
+                    data-freq="93.9 FM · Madrid">
+                🎶 Los 40 Principales (Madrid)
+            </option>
+            
+            <option value="https://rtvc-radio.flumotion.com/rtvc-radio/radio1-high.mp3" 
+                    data-icon="🏛️" 
+                    data-freq="104.7 FM · Canarias">
+                🏛️ Canarias Radio La Autonómica
+            </option>
+            
+            <option value="https://stream.airwavebroadcast.com/listen/energy_fm/energy" 
+                    data-icon="⚡" 
+                    data-freq="106.0 FM · Canarias">
+                ⚡ Energy FM
+            </option>
+            
+            <option value="https://eu1.lhdserver.es:3199/stream" 
+                    data-icon="📻" 
+                    data-freq="95.1 FM · Canarias">
+                📻 Hola FM
+            </option>
+            
+            <option value="https://s1.viastreaming.net:7120/stream/1/" 
+                    data-icon="🌴" 
+                    data-freq="101.0 FM · Tenerife">
+                🌴 Oasis FM (Tenerife)
+            </option>
+            
+            <option value="https://server8.emitironline.com:18163/stream" 
+                    data-icon="📻" 
+                    data-freq="102.2 FM · Tenerife">
+                📻 Radio Gigante (Tenerife)
+            </option>
+            
+            <option value="https://cervera.eldialdigital.com:22131/stream" 
+                    data-icon="📻" 
+                    data-freq="94.5 FM · Canarias">
+                📻 Radio Marca (Canarias)
+            </option>
+            
+            <option value="https://playerservices.streamtheworld.com/api/livestream-redirect/SER_LAS_PALMASAAC_SC" 
+                    data-icon="📻" 
+                    data-freq="102.4 FM · Las Palmas">
+                📻 SER Las Palmas
+            </option>
+            
+            <option value="https://playerservices.streamtheworld.com/api/livestream-redirect/SER_TENERIFEAAC_SC" 
+                    data-icon="📻" 
+                    data-freq="101.1 FM · Tenerife">
+                📻 Radio Club Tenerife
+            </option>
+            
+            <option value="https://panel.amediastream.eu:8500/live" 
+                    data-icon="🇳🇱" 
+                    data-freq="90.7 FM · Gran Canaria">
+                🇳🇱 Holland FM (Gran Canaria)
+            </option>
+            
+            <option value="https://streaming.enacast.com/radiocarrizal128.mp3" 
+                    data-icon="📻" 
+                    data-freq="101.7 FM · Gran Canaria">
+                📻 Radio Carrizal
+            </option>
+            
+            <option value="https://radio.streamenginelogin.com:8018/stream" 
+                    data-icon="📻" 
+                    data-freq="104.2 FM · Gran Canaria">
+                📻 Radio Faycan (Gran Canaria)
+            </option>
+            
+            <option value="https://sonic.mediatelekom.net/9054/stream/1/" 
+                    data-icon="🏝️" 
+                    data-freq="90.7 FM · Lanzarote">
+                🏝️ Radio Lanzarote
+            </option>
+            
+            <option value="https://eu1.lhdserver.es:8055/stream" 
+                    data-icon="📻" 
+                    data-freq="88.0 FM · Las Palmas">
+                📻 Radio Sintonía (Las Palmas)
+            </option>
+            
+            <option value="https://relay.stream.enacast-cloud.com:40213/carmelomartinHD.mp3" 
+                    data-icon="📻" 
+                    data-freq="107.8 FM · Telde">
+                📻 Radio Aventura (Telde)
+            </option>
+            
+            <option value="https://sonic.sistemahost.es/8260/stream" 
+                    data-icon="📻" 
+                    data-freq="Stream · Canarias">
+                📻 Radio MEGA
+            </option>
+            
+            <option value="https://escucha.calima.fm/stream" 
+                    data-icon="🇮🇹" 
+                    data-freq="98.8 FM · Gran Canaria">
+                🇮🇹 Radio Calima
+            </option>
+            
+            <option value="https://mediastreamm.com/8176/stream" 
+                    data-icon="🐐" 
+                    data-freq="106.7 FM · Fuerteventura">
+                🐐 Radio SurFM (Aguacabras)
+            </option>
+            
+            <option value="http://radio.digitalfarocanarias.com/listen/radio_faro/RadioFaro" 
+                    data-icon="🏖️" 
+                    data-freq="92.5 / 107.5 FM · Maspalomas">
+                🏖️ Radio Faro (Maspalomas)
+            </option>
+            
+            <option value="https://oceano-2.nty.uy/netradio/listen.mp3:8000/;?download=false" 
+                    data-icon="🌊" 
+                    data-freq="100.8 FM · Vecindario">
+                🌊 Océano Radio (Vecindario)
+            </option>
+            
+            <option value="https://radiostreaming.online:8006/stream" 
+                    data-icon="📻" 
+                    data-freq="98.3 FM · Vecindario">
+                📻 Radio Las Tirajanas (Vecindario)
+            </option>
+            
+            <option value="https://bbkissfm.kissfmradio.cires21.com/bbkissfm.mp3" 
+                    data-icon="🎵" 
+                    data-freq="102.4 FM · Las Palmas">
+                🎵 KISS FM (Canarias)
+            </option>
+            
+            <option value="https://srv7021.dns-lcinternet.com/8076/stream" 
+                    data-icon="🌍" 
+                    data-freq="96.8 / 90.1 FM · Cruce de Arinaga">
+                🌍 Radio Planeta Gran Canaria
+            </option>
+            
+            <option value="https://stream.zeno.fm/972ksag0xqzuv" 
+                    data-icon="📻" 
+                    data-freq="102.2 FM · Gran Canaria">
+                📻 Radio Ingenio (Gran Canaria)
+            </option>
+            
+            <option value="https://radiostreaming.online/8004/stream" 
+                    data-icon="🎵" 
+                    data-freq="92.0 / 95.9 FM · Maspalomas">
+                🎵 Radio Top 21 (Gran Canaria)
+            </option>
+            
+            <option value="https://radiostreaming.online/8008/stream" 
+                    data-icon="🌬️" 
+                    data-freq="Stream · Gran Canaria">
+                🌬️ Wind Radio (Gran Canaria)
+            </option>
+            
+            <!-- ============================================ -->
+            <!-- EMISORAS CHILENAS (5)                        -->
+            <!-- ============================================ -->
+            
+            <option value="https://sonic.mallocohosting.cl:8108/stream" 
+                    data-icon="🇨🇱" 
+                    data-freq="Stream · Chile">
+                🇨🇱 Máxima Stereo (Chile)
+            </option>
+            
+            <option value="https://maxradio.azuracast.com.es:8020/stream/1/" 
+                    data-icon="🎵" 
+                    data-freq="Stream · Chile">
+                🎵 Radio Maxima FM (Chile)
+            </option>
+            
+            <option value="https://stream.radioclub80.cl:8052/trancelive80.mp3" 
+                    data-icon="🎵" 
+                    data-freq="Stream · Chile">
+                🎵 Club 80 Trance (Chile)
+            </option>
+            
+            <option value="https://redirector.dps.live/biobiosantiago/mp3/icecast.audio" 
+                    data-icon="📻" 
+                    data-freq="99.7 FM · Chile">
+                📻 Radio Bío Bío (Chile)
+            </option>
+            
+            <option value="https://24363.live.streamtheworld.com:443/IMAGINAAAC_SC" 
+                    data-icon="🎵" 
+                    data-freq="88.1 FM · Chile">
+                🎵 Radio Imagina (Chile)
+            </option>
+            
+            <!-- ============================================ -->
+            <!-- EMISORAS GRIEGAS (2)                         -->
+            <!-- ============================================ -->
+            
+            <option value="https://s6.onweb.gr/8012/stream" 
+                    data-icon="🎵" 
+                    data-freq="106.4 FM · Volos, Grecia">
+                🎵 Top FM (Tukumuca) - Grecia
+            </option>
+            
+            <option value="https://cast6.my-control-panel.com/proxy/venus1051/stream" 
+                    data-icon="🇬🇷" 
+                    data-freq="Stream · Grecia">
+                🇬🇷 Venus FM (Grecia)
+            </option>
+            
+            <!-- ============================================ -->
+            <!-- EMISORAS ARGENTINAS (2)                      -->
+            <!-- ============================================ -->
+            
+            <option value="https://frontend.radiohdvivo.com/continental/live" 
+                    data-icon="🇦🇷" 
+                    data-freq="AM 590 · Buenos Aires">
+                🇦🇷 Radio Continental (Argentina)
+            </option>
+            
+            <option value="https://playerservices.streamtheworld.com/api/livestream-redirect/ASPEN_SC" 
+                    data-icon="🎷" 
+                    data-freq="102.3 FM · Buenos Aires">
+                🎷 FM Aspen (Argentina)
+            </option>
+            
+            <!-- ============================================ -->
+            <!-- EMISORAS ESPAÑOLAS (15)                      -->
+            <!-- ============================================ -->
+            
+            <option value="https://radio-atres-live.ondacero.es/api/livestream-redirect/EFM_LAS_PALMASAAC.m3u8?dist=ATRESMEDIA-Web&r=mdynk" 
+                    data-icon="🇪🇸" 
+                    data-freq="97.1 FM · Las Palmas">
+                🇪🇸 Europa FM (España)
+            </option>
+            
+            <option value="https://app.sonicpanelradio.com/8072/stream" 
+                    data-icon="🎵" 
+                    data-freq="Stream · Las Palmas">
+                🎵 9 Radio (Las Palmas)
+            </option>
+            
+            <option value="https://cadena100-cope.flumotion.com/playlist.m3u8" 
+                    data-icon="🎵" 
+                    data-freq="89.4 FM · Madrid">
+                🎵 Cadena 100 (España)
+            </option>
+            
+            <option value="https://atres-live.ondacero.es/live/ondacero/master.m3u8" 
+                    data-icon="📻" 
+                    data-freq="FM · Madrid">
+                📻 Onda Cero (España)
+            </option>
+            
+            <option value="https://stream.zeno.fm/sbfxdfgiomtuv" 
+                    data-icon="🎵" 
+                    data-freq="Stream · España">
+                🎵 Yasshop (España)
+            </option>
+            
+            <option value="https://stream.zeno.fm/sfqwqh7vd6quv" 
+                    data-icon="🎵" 
+                    data-freq="Stream · Zeno.FM">
+                🎵 La Tronadora (Streaming)
+            </option>
+            
+            <!-- ===== EMISORAS LOS40 ===== -->
+            
+            <option value="https://eu-playerservices.streamtheworld.com/api/livestream-redirect/LOS40_URBAN_SC" 
+                    data-icon="🎵" 
+                    data-freq="Stream · España">
+                🎵 LOS40 Urban (España)
+            </option>
+            
+            <option value="https://eu-playerservices.streamtheworld.com/api/livestream-redirect/LOS40_CLASSIC_SC" 
+                    data-icon="🎵" 
+                    data-freq="Stream · España">
+                🎵 LOS40 Classic (España)
+            </option>
+            
+            <option value="https://eu-playerservices.streamtheworld.com/api/livestream-redirect/LOS40_DANCE_SC" 
+                    data-icon="🎵" 
+                    data-freq="Stream · España">
+                🎵 LOS40 Dance (España)
+            </option>
+            
+            <!-- ===== CADENA DIAL ===== -->
+            
+            <option value="https://playerservices.streamtheworld.com/api/livestream-redirect/CADENADIAL_SC" 
+                    data-icon="🎵" 
+                    data-freq="101.4 FM · Las Palmas">
+                🎵 Cadena Dial (España)
+            </option>
+            
+            <!-- ===== esRadio ===== -->
+            
+            <option value="https://libertaddigital-radio-live1.flumotion.com/libertaddigital/ld-live1-low.mp3" 
+                    data-icon="📻" 
+                    data-freq="99.1 FM · Madrid">
+                📻 esRadio (España)
+            </option>
+            
+            <!-- ============================================ -->
+            <!-- EMISORAS VENEZOLANAS (2)                     -->
+            <!-- ============================================ -->
+            
+            <option value="https://stream.zeno.fm/xc0q62tc9f0uv" 
+                    data-icon="🇻🇪" 
+                    data-freq="Streaming · Caracas">
+                🇻🇪 LOS40 Venezuela
+            </option>
+            
+            <option value="https://acp4.lorini.net:2050/stream" 
+                    data-icon="🇻🇪" 
+                    data-freq="107.3 FM · Caracas">
+                🇻🇪 La Mega Estación (Venezuela)
+            </option>
+            
+            <!-- ============================================ -->
+            <!-- EMISORAS ZENO.FM (3)                         -->
+            <!-- ============================================ -->
+            
+            <option value="https://stream.zeno.fm/97gyvgz7kyvtv" 
+                    data-icon="🎶" 
+                    data-freq="Stream · Zeno.FM">
+                🎶 Wonder 80s (Streaming)
+            </option>
+            
+            <option value="https://stream.zeno.fm/qmhf2yd9dm0uv" 
+                    data-icon="🎵" 
+                    data-freq="Stream · Zeno.FM">
+                🎵 Reggaeton Radio (Streaming)
+            </option>
+            
+            <option value="https://stream.zeno.fm/mxr8ltjsf3vuv" 
+                    data-icon="🎸" 
+                    data-freq="Stream · Zeno.FM">
+                🎸 Classic Rock Vibes AAC (Streaming)
+            </option>
+            
+            <!-- ============================================ -->
+            <!-- EMISORAS POLACAS (2)                         -->
+            <!-- ============================================ -->
+            
+            <option value="http://195.150.20.242:8000/rmf_fm" 
+                    data-icon="🇵🇱" 
+                    data-freq="Stream · Polonia">
+                🇵🇱 RMF FM (Polonia)
+            </option>
+            
+            <option value="https://ice2.radioi.pl:8443/stream" 
+                    data-icon="🇵🇱" 
+                    data-freq="Stream · Polonia">
+                🇵🇱 Radio I (Polonia)
+            </option>
+            
+            <!-- ============================================ -->
+            <!-- EMISORAS PORTUGUESAS (5)                     -->
+            <!-- ============================================ -->
+            
+            <option value="https://stream-hls.rayo.pt/m80.aac/playlist.m3u8?direct=true" 
+                    data-icon="🎵" 
+                    data-freq="104.3 FM · Lisboa">
+                🎵 M80 Rádio (Portugal)
+            </option>
+            
+            <option value="https://stream-hls.rayo.pt/comercial.aac/playlist.m3u8?direct=true" 
+                    data-icon="📻" 
+                    data-freq="FM · Portugal">
+                📻 Rádio Comercial (Portugal)
+            </option>
+            
+            <option value="https://stream-hls.rayo.pt/cidade.aac/playlist.m3u8?direct=true" 
+                    data-icon="🌆" 
+                    data-freq="FM · Portugal">
+                🌆 Cidade FM (Portugal)
+            </option>
+            
+            <option value="https://stream-hls.rayo.pt/smooth.aac/playlist.m3u8?direct=true" 
+                    data-icon="🎷" 
+                    data-freq="FM · Portugal">
+                🎷 Smooth FM (Portugal)
+            </option>
+            
+            <option value="https://stream-hls.rayo.pt/batidafm.aac/playlist.m3u8?direct=true" 
+                    data-icon="🎶" 
+                    data-freq="Stream · Portugal">
+                🎶 Batida FM (Portugal)
+            </option>
+            
+            <!-- ============================================ -->
+            <!-- EMISORAS ALEMANAS (2)                        -->
+            <!-- ============================================ -->
+            
+            <option value="http://stream.antenne.de:80/oldies-but-goldies" 
+                    data-icon="🎵" 
+                    data-freq="Oldies · Alemania">
+                🎵 Antenne Bayern Oldies (Alemania)
+            </option>
+            
+            <option value="http://stream.antenne.de:80/heavy-metal" 
+                    data-icon="🎸" 
+                    data-freq="Heavy Metal · Alemania">
+                🎸 Rock Antenne Heavy Metal (Alemania)
+            </option>
+            
+        </select>
+    </div>
+
+    <!-- ===== AUDIO CONTROLS ===== -->
+    <div class="audio-controls">
+        <button class="btn-play" id="playBtn">▶</button>
+        <audio id="radioPlayer" controls preload="none">
+            <source id="audioSource" src="" type="audio/mpeg">
+            Tu navegador no soporta audio HTML5.
+        </audio>
+    </div>
+
+    <!-- ===== WARNING ===== -->
+    <div class="warning-msg">
+        <span>💡</span>
+        <span>🔴 Selecciona una emisora y dale al Play.</span>
+    </div>
+
+    <!-- ===== FOOTER ===== -->
+    <div class="radio-footer">
+        <span class="count" id="stationCount">📻 65 emisoras</span>
+        <span class="url-box" id="urlBox">🔗 Selecciona una emisora</span>
+        <span class="info-text">🌍 <strong>Internet Radio</strong></span>
+    </div>
+
+    <!-- ===== TOUCH HINT ===== -->
+    <div class="touch-hint">
+        <span>⬆️⬇️ <span class="key">Volumen</span></span>
+        <span>⬅️➡️ <span class="key">Canales</span></span>
+        <span>👆👆 <span class="key">Play/Pausa</span></span>
+        <span>⌨️ <span class="key">Flechas</span></span>
+    </div>
+</div>
+
+<script>
+// ============================================================
+// REPRODUCTOR CON SOPORTE HLS - 65 EMISORAS
+// ============================================================
+
+// ===== ELEMENTOS =====
+const selector = document.getElementById('radioSelector');
+const audioPlayer = document.getElementById('radioPlayer');
+const sourceElem = document.getElementById('audioSource');
+const playBtn = document.getElementById('playBtn');
+const radioName = document.getElementById('radioName');
+const radioFreq = document.getElementById('radioFreq');
+const statusText = document.getElementById('statusText');
+const logoContainer = document.getElementById('logoContainer');
+const urlBox = document.getElementById('urlBox');
+const stationCount = document.getElementById('stationCount');
+const formatBadge = document.getElementById('formatBadge');
+const prevBtn = document.getElementById('prevBtn');
+const nextBtn = document.getElementById('nextBtn');
+const channelCounter = document.getElementById('channelCounter');
+const totalChannels = document.getElementById('totalChannels');
+
+// ===== VOLUMEN INDICATOR =====
+const volumeIndicator = document.getElementById('volumeIndicator');
+const volIcon = document.getElementById('volIcon');
+const volText = document.getElementById('volText');
+const volBarFill = document.getElementById('volBarFill');
+
+// ===== VARIABLES =====
+let hls = null;
+let isHlsStream = false;
+let touchStartX = 0, touchStartY = 0, lastTapTime = 0;
+let volumeTimeout = null;
+
+// ===== INICIALIZACIÓN =====
+const totalStations = selector.options.length - 1;
+totalChannels.textContent = totalStations;
+stationCount.textContent = `📻 ${totalStations} emisoras`;
+
+// ===== FUNCIONES DE NAVEGACIÓN =====
+function getCurrentIndex() { return selector.selectedIndex; }
+
+function goToStation(index) {
+    if (index >= 1 && index < selector.options.length) {
+        selector.selectedIndex = index;
+        updateDisplay();
+        updateCounter();
+    }
+}
+
+function nextStation() {
+    const current = getCurrentIndex();
+    goToStation(current + 1 < selector.options.length ? current + 1 : 1);
+}
+
+function prevStation() {
+    const current = getCurrentIndex();
+    goToStation(current - 1 >= 1 ? current - 1 : selector.options.length - 1);
+}
+
+function updateCounter() {
+    const current = getCurrentIndex();
+    channelCounter.innerHTML = `${current >= 1 ? current : '-'} / <span id="totalChannels">${totalStations}</span>`;
+}
+
+// ===== FUNCIONES DE VOLUMEN =====
+function showVolume(volume) {
+    const vol = Math.round(volume * 100);
+    volText.textContent = vol + '%';
+    volBarFill.style.width = vol + '%';
+    if (vol === 0) volIcon.textContent = '🔇';
+    else if (vol < 33) volIcon.textContent = '🔈';
+    else if (vol < 66) volIcon.textContent = '🔉';
+    else volIcon.textContent = '🔊';
+    volumeIndicator.classList.add('show');
+    clearTimeout(volumeTimeout);
+    volumeTimeout = setTimeout(() => {
+        volumeIndicator.classList.remove('show');
+    }, 1200);
+}
+
+function changeVolume(delta) {
+    let vol = audioPlayer.volume + delta;
+    vol = Math.max(0, Math.min(1, vol));
+    audioPlayer.volume = vol;
+    showVolume(vol);
+}
+
+// ===== FUNCIÓN PRINCIPAL =====
+function updateDisplay() {
+    const selected = selector.options[selector.selectedIndex];
+    const value = selected.value || '';
+    const icon = selected.getAttribute('data-icon') || '📻';
+    const freq = selected.getAttribute('data-freq') || '🌍 Disponible en todo el mundo';
+    let name = selected.textContent.trim();
+    name = name.replace(/^[🎵🌊📡📢🔊🎶🏛️⚡🌴🇳🇱🏝️🇮🇹🐐🏖️🇨🇱🌍🇦🇷🎷🇪🇸🇬🇷🇵🇱📻🌆🎶🎸🇻🇪🌬️]\s*/, '').trim();
+
+    radioName.textContent = name || 'Selecciona una emisora';
+    radioFreq.textContent = freq;
+    logoContainer.textContent = icon;
+
+    // Detener HLS anterior
+    if (hls) {
+        hls.destroy();
+        hls = null;
+        isHlsStream = false;
+    }
+
+    audioPlayer.pause();
+    audioPlayer.currentTime = 0;
+    audioPlayer.removeAttribute('src');
+    sourceElem.src = '';
+
+    if (value) {
+        const isHls = value.includes('.m3u8') || value.includes('/HLS/');
+        
+        if (isHls && typeof Hls !== 'undefined' && Hls.isSupported()) {
+            // ===== USAR HLS.JS =====
+            isHlsStream = true;
+            hls = new Hls({
+                enableWorker: true,
+                lowLatencyMode: true,
+            });
+            hls.loadSource(value);
+            hls.attachMedia(audioPlayer);
+            hls.on(Hls.Events.MANIFEST_PARSED, function() {
+                audioPlayer.play().catch(() => {});
+            });
+            hls.on(Hls.Events.ERROR, function(event, data) {
+                if (data.fatal) {
+                    console.error('❌ Error HLS:', data);
+                    statusText.className = 'error';
+                    statusText.textContent = '❌ Error HLS';
+                    playBtn.textContent = '▶';
+                }
+            });
+            statusText.className = 'playing';
+            statusText.textContent = '📡 Cargando HLS...';
+            formatBadge.textContent = 'HLS';
+            urlBox.textContent = `🔗 ${value}`;
+            urlBox.style.color = '#4ade80';
+            updateCounter();
+            return;
+        } else if (isHls && audioPlayer.canPlayType('application/vnd.apple.mpegurl')) {
+            // ===== SAFARI - SOPORTE NATIVO =====
+            isHlsStream = true;
+            audioPlayer.src = value;
+            audioPlayer.play().catch(() => {});
+            statusText.className = 'playing';
+            statusText.textContent = '🔊 Reproduciendo HLS';
+            formatBadge.textContent = 'HLS';
+            urlBox.textContent = `🔗 ${value}`;
+            urlBox.style.color = '#4ade80';
+            updateCounter();
+            return;
+        }
+
+        // ===== STREAM NORMAL (MP3/AAC) =====
+        isHlsStream = false;
+        sourceElem.src = value;
+        audioPlayer.load();
+        statusText.className = 'playing';
+        statusText.textContent = '🔊 Cargando...';
+        urlBox.textContent = `🔗 ${value}`;
+        urlBox.style.color = '#4ade80';
+        formatBadge.textContent = 'MP3';
+        
+        const playPromise = audioPlayer.play();
+        if (playPromise !== undefined) {
+            playPromise.then(() => {
+                statusText.textContent = '🔊 Reproduciendo en vivo';
+            }).catch(() => {
+                statusText.textContent = '▶️ Haz clic en Play';
+            });
+        }
+    } else {
+        // ===== SIN SELECCIÓN =====
+        statusText.className = 'stopped';
+        statusText.textContent = selected.index > 0 ? '⏸️ Sin URL' : '⏸️ En espera';
+        urlBox.textContent = selected.index > 0 ? '🔴 URL pendiente' : '🔗 Selecciona una emisora';
+        urlBox.style.color = selected.index > 0 ? '#ef4444' : '#475569';
+        formatBadge.textContent = selected.index > 0 ? '❓' : 'MP3';
+        playBtn.textContent = '▶';
+    }
+    updateCounter();
+}
+
+// ===== EVENTOS =====
+selector.addEventListener('change', updateDisplay);
+prevBtn.addEventListener('click', prevStation);
+nextBtn.addEventListener('click', nextStation);
+
+playBtn.addEventListener('click', function() {
+    if (audioPlayer.paused) {
+        audioPlayer.play().catch(() => {});
+    } else {
+        audioPlayer.pause();
+    }
+});
+
+// ===== EVENTOS DE AUDIO =====
+audioPlayer.addEventListener('play', () => {
+    playBtn.textContent = '⏸';
+    if (!isHlsStream) {
+        statusText.className = 'playing';
+        statusText.textContent = '🔊 Reproduciendo en vivo';
+    }
+});
+
+audioPlayer.addEventListener('pause', () => {
+    playBtn.textContent = '▶';
+    if (!isHlsStream && sourceElem.src) {
+        statusText.className = 'stopped';
+        statusText.textContent = '⏸️ Pausado';
+    }
+});
+
+audioPlayer.addEventListener('error', () => {
+    if (!isHlsStream) {
+        statusText.className = 'error';
+        statusText.textContent = '❌ Error al reproducir';
+        playBtn.textContent = '▶';
+    }
+});
+
+// ===== CONTROLES TÁCTILES =====
+document.addEventListener('touchstart', function(e) {
+    const touch = e.touches[0];
+    touchStartX = touch.clientX;
+    touchStartY = touch.clientY;
+}, { passive: true });
+
+document.addEventListener('touchmove', function(e) {
+    e.preventDefault();
+}, { passive: false });
+
+document.addEventListener('touchend', function(e) {
+    const touchEndX = e.changedTouches[0].clientX;
+    const touchEndY = e.changedTouches[0].clientY;
+    const diffX = touchStartX - touchEndX;
+    const diffY = touchStartY - touchEndY;
+    const absDiffX = Math.abs(diffX);
+    const absDiffY = Math.abs(diffY);
+    
+    if (absDiffX < 30 && absDiffY < 30) {
+        const now = Date.now();
+        if (now - lastTapTime < 300 && lastTapTime > 0) {
+            playBtn.click();
+            lastTapTime = 0;
+            return;
+        }
+        lastTapTime = now;
+        return;
+    }
+    
+    if (absDiffY > absDiffX && absDiffY > 40) {
+        if (diffY > 0) changeVolume(0.08);
+        else changeVolume(-0.08);
+        return;
+    }
+    
+    if (absDiffX > 50) {
+        if (diffX > 0) nextStation();
+        else prevStation();
+    }
+}, { passive: true });
+
+// ===== TECLADO =====
+document.addEventListener('keydown', function(e) {
+    if (['INPUT', 'SELECT', 'TEXTAREA'].includes(e.target.tagName)) return;
+    switch(e.key) {
+        case 'ArrowUp': e.preventDefault(); changeVolume(0.1); showVolume(audioPlayer.volume); break;
+        case 'ArrowDown': e.preventDefault(); changeVolume(-0.1); showVolume(audioPlayer.volume); break;
+        case 'ArrowRight': e.preventDefault(); nextStation(); break;
+        case 'ArrowLeft': e.preventDefault(); prevStation(); break;
+        case ' ': e.preventDefault(); playBtn.click(); break;
+    }
+});
+
+// ===== INICIAR =====
+updateDisplay();
+
+console.log(`📻 Radio Canarias - ${totalStations} emisoras disponibles`);
+console.log('🎵 32 canarias + 5 chilenas + 2 griegas + 2 argentinas + 15 españolas + 2 polacas + 5 portuguesas + 2 alemanas + 3 zeno + 2 venezolanas');
+console.log('🎧 ¡Disfruta de la radio!');
+</script>
+</body>
+</html>
