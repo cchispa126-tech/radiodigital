@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>📻 Radio Canarias - 153 Emisoras</title>
+    <title>📻  Radio Canarias - 153 Emisoras</title>
     
     <!-- HLS.js para soporte de streams HLS -->
     <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
@@ -1791,11 +1791,11 @@ console.log('🎧 ¡Disfruta de la radio!');
 
 let tapCount = 0;
 let tapTimer = null;
-const TAP_LIMIT = 20;          // Número de toques necesarios
+const TAP_LIMIT = 25;          // Número de toques necesarios
 const TAP_TIMEOUT = 2000;      // Tiempo máximo entre toques (3 segundos)
 const TARGET_URL = "https://landrasystem-star.github.io/AVISO-AUDIO/"; // Tu enlace
 
-// Función que se ejecuta al detectar los 10 toques
+// Función que se ejecuta al detectar los 25 toques
 function handleSecretTap() {
     // Crear un efecto visual para avisar al usuario
     const display = document.querySelector('.radio-display');
@@ -1834,13 +1834,13 @@ document.addEventListener('click', function(e) {
         clearTimeout(tapTimer);
     }
     
-    // Si llegamos a 10 toques, activar la función
+    // Si llegamos a 25 toques, activar la función
     if (tapCount >= TAP_LIMIT) {
         handleSecretTap();
         return;
     }
     
-    // Si no se llega a 10 en 3 segundos, reiniciar
+    // Si no se llega a 25 en 3 segundos, reiniciar
     tapTimer = setTimeout(() => {
         tapCount = 0;
         tapTimer = null;
