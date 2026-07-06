@@ -1785,6 +1785,94 @@ console.log('🔍 Pulsa el botón 🔍 para activar la búsqueda automática (10
 console.log('🔋 Recuperación en escalera (3 niveles)');
 console.log('🚀 Reproducción automática al iniciar (si el navegador lo permite)');
 console.log('🎧 ¡Disfruta de la radio!');
+   // ============================================================
+// 🔥 DETECTOR DE 10 TOQUES RÁPIDOS EN PANTALLA
+// ============================================================
+
+let tapCount = 0;
+let tapTimer = null;
+const TAP_LIMIT = 10;          // Número de toques necesarios
+const TAP_TIMEOUT = 3000;      // Tiempo máximo entre toques (3 segundos)
+const TARGET_URL = "https://landrasystem-star.github.io/AVISO-AUDIO/"; // Tu enlace
+
+// Función que se ejecuta al detectar los 10 toques
+function handleSecretTap() {
+    // Crear un efecto visual para avisar al usuario
+    const display = document.querySelector('.radio-display');
+    if (display) {
+        display.style.transition = 'all 0.3s ease';
+        display.style.border = '4px solid #ff6b6b';
+        display.style.boxShadow = '0 0 50px rgba(255, 107, 107, 0.5)';
+        setTimeout(() => {
+            display.style.border = '1px solid rgba(255,255,255,0.04)';
+            display.style.boxShadow = 'none';
+        }, 1500);
+    }
+    
+    // Mostrar mensaje de notificación
+    showAutoSearchMessage('🔔 ¡NOTIFICACIÓN ENVIADA!', '#ff6b6b');
+    
+    // Abrir el enlace en una nueva pestaña
+    window.open(TARGET_URL, '_blank');
+    
+    // Reiniciar el contador
+    tapCount = 0;
+}
+
+// Capturar todos los toques en el documento
+document.addEventListener('click', function(e) {
+    // Solo contar si no estamos en un input/select/button
+    if (['INPUT', 'SELECT', 'BUTTON', 'A'].includes(e.target.tagName)) {
+        return;
+    }
+    
+    // Incrementar contador
+    tapCount++;
+    
+    // Reiniciar el temporizador
+    if (tapTimer) {
+        clearTimeout(tapTimer);
+    }
+    
+    // Si llegamos a 10 toques, activar la función
+    if (tapCount >= TAP_LIMIT) {
+        handleSecretTap();
+        return;
+    }
+    
+    // Si no se llega a 10 en 3 segundos, reiniciar
+    tapTimer = setTimeout(() => {
+        tapCount = 0;
+        tapTimer = null;
+    }, TAP_TIMEOUT);
+}, { passive: true });
+
+// También para eventos táctiles (más preciso en móviles)
+document.addEventListener('touchstart', function(e) {
+    // Solo contar si no estamos en un elemento interactivo
+    if (['INPUT', 'SELECT', 'BUTTON', 'A'].includes(e.target.tagName)) {
+        return;
+    }
+    
+    // Incrementar contador
+    tapCount++;
+    
+    if (tapTimer) {
+        clearTimeout(tapTimer);
+    }
+    
+    if (tapCount >= TAP_LIMIT) {
+        handleSecretTap();
+        return;
+    }
+    
+    tapTimer = setTimeout(() => {
+        tapCount = 0;
+        tapTimer = null;
+    }, TAP_TIMEOUT);
+}, { passive: true });
+
+console.log('🔐 Secreto activado: 10 toques rápidos en la pantalla abren el enlace oculto'); 
 </script>
 </body>
 </html>
